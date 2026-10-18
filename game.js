@@ -104,35 +104,96 @@ document.getElementById('btn-start').addEventListener('click', () => {
 });
 
 // ============================================================
-// CASE LIBRARY
+// CASE LIBRARY / ROADMAP
 // ============================================================
-function renderCaseLibrary(theme = 'all') {
-  const grid = document.getElementById('case-grid');
-  const cases = theme === 'all' ? window.CASES : window.CASES.filter(c => c.theme === theme);
-  grid.innerHTML = cases.map(c => `
-    <div class="case-card" data-id="${c.id}">
-      <div class="case-theme-badge">${c.theme.toUpperCase()}</div>
-      <h3>${c.title}</h3>
-      <p>${c.summary}</p>
-      <div class="case-diff">Difficulty: ${'★'.repeat(c.difficulty)}${'☆'.repeat(3 - c.difficulty)}</div>
-    </div>
-  `).join('');
+function getSolvedCases() {
+  try {
+    return JSON.parse(localStorage.getItem('noir_solved_cases_list') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
 
-  grid.querySelectorAll('.case-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const c = window.CASES.find(x => x.id === card.dataset.id);
-      openCaseSetup(c);
+function markCaseSolved(caseId) {
+  const solved = getSolvedCases();
+  if (!solved.includes(caseId)) {
+    solved.push(caseId);
+    localStorage.setItem('noir_solved_cases_list', JSON.stringify(solved));
+  }
+}
+
+function renderCaseLibrary() {
+  const container = document.getElementById('roadmap-container');
+  const summaryEl = document.getElementById('roadmap-progress-summary');
+  if (!container || !window.CASES) return;
+
+  const solvedList = getSolvedCases();
+  const cases = window.CASES;
+  const totalCases = cases.length;
+  const solvedCount = solvedList.length;
+
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div><b>CAREER PROGRESSION</b> — Solved: ${solvedCount} / ${totalCases} Cases</div>
+      <div style="color:var(--amber-light);font-size:13px;">${solvedCount === totalCases ? '🏆 Master Detective' : 'Solve cases in order to unlock the next mystery.'}</div>
+    `;
+  }
+
+  container.innerHTML = cases.map((c, index) => {
+    // Progression rule: Case 0 is unlocked by default. Case N is unlocked if Case N-1 is solved.
+    const isSolved = solvedList.includes(c.id);
+    const isUnlocked = index === 0 || solvedList.includes(cases[index - 1].id) || isSolved;
+    
+    let statusClass = 'locked';
+    let statusText = '🔒 Locked';
+    let tagClass = 'tag-locked';
+    let actionPrompt = 'Solve previous case to unlock';
+
+    if (isSolved) {
+      statusClass = 'solved';
+      statusText = '✓ Solved';
+      tagClass = 'tag-solved';
+      actionPrompt = 'Replay Case →';
+    } else if (isUnlocked) {
+      statusClass = 'unlocked';
+      statusText = '★ Available';
+      tagClass = 'tag-unlocked';
+      actionPrompt = 'Investigate Now →';
+    }
+
+    return `
+      <div class="roadmap-node ${statusClass}" data-id="${c.id}" data-unlocked="${isUnlocked}">
+        <div class="roadmap-icon-col">
+          <div class="roadmap-badge">${isSolved ? '✓' : (index + 1)}</div>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-meta">
+            <span class="roadmap-case-step">CASE FILE 0${index + 1} • ${c.theme.toUpperCase()}</span>
+            <span class="roadmap-status-tag ${tagClass}">${statusText}</span>
+          </div>
+          <h3>${c.title}</h3>
+          <p>${c.summary}</p>
+          <div class="roadmap-footer">
+            <span class="roadmap-diff">Difficulty: ${'★'.repeat(c.difficulty)}${'☆'.repeat(3 - c.difficulty)}</span>
+            <span class="roadmap-action-prompt">${actionPrompt}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.roadmap-node').forEach(node => {
+    node.addEventListener('click', () => {
+      const isUnlocked = node.dataset.unlocked === 'true';
+      if (!isUnlocked) {
+        alert('🔒 This case is locked! Crack the previous case file first to prove your detective credentials.');
+        return;
+      }
+      const c = window.CASES.find(x => x.id === node.dataset.id);
+      if (c) openCaseSetup(c);
     });
   });
 }
-
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderCaseLibrary(btn.dataset.theme);
-  });
-});
 
 document.getElementById('btn-back-library').addEventListener('click', () => showScreen('screen-title'));
 
@@ -583,6 +644,10 @@ async function showVerdict(suspectId, cited) {
   document.getElementById('debrief-text').textContent = c.debrief;
   document.getElementById('source-credit').textContent = `Source: ${c.source}`;
 
+  if (sc.correct) {
+    markCaseSolved(c.id);
+  }
+
   // Leaderboard + save
   const msgEl = document.getElementById('score-save-msg');
   if (currentPlayer?.user) {
@@ -633,9 +698,12 @@ document.getElementById('btn-play-again').addEventListener('click', () => {
 // ============================================================
 // SUSPENSE MUSIC (Web Audio API Synthesizer)
 // ============================================================
+// GAME SETTINGS & SUSPENSE MUSIC
+// ============================================================
 let audioCtx = null;
 let musicPlaying = false;
 let musicInterval = null;
+let masterVolume = 0.5;
 
 function initAudio() {
   if (!audioCtx) {
@@ -651,8 +719,9 @@ function playSuspenseNote(freq, duration, type = 'sine', gainVal = 0.08) {
     osc.type = type;
     osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
     
-    gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(gainVal, audioCtx.currentTime + 0.3);
+    const targetGain = gainVal * masterVolume;
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetGain), audioCtx.currentTime + 0.3);
     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
 
     osc.connect(gain);
@@ -671,35 +740,72 @@ function toggleSuspenseMusic() {
     audioCtx.resume();
   }
   musicPlaying = !musicPlaying;
-  const btn = document.getElementById('btn-toggle-music');
+  const btn = document.getElementById('btn-setting-music');
   if (musicPlaying) {
-    btn.textContent = '🎵 Music: ON';
-    btn.classList.add('playing');
-    // Dark moody suspense notes (D minor / noir intervals)
+    if (btn) btn.textContent = 'Music: ON';
     const notes = [73.42, 82.41, 87.31, 98.00, 110.00, 130.81, 146.83];
     let step = 0;
-    // Base drone
     playSuspenseNote(55, 6, 'triangle', 0.06);
     musicInterval = setInterval(() => {
       if (!musicPlaying) return;
-      // Low drone pulse every 4 beats
       if (step % 4 === 0) {
         playSuspenseNote(55, 4.5, 'triangle', 0.07);
         playSuspenseNote(82.41, 3.5, 'sine', 0.04);
       }
-      // Eerie suspense note
       const n = notes[Math.floor(Math.random() * notes.length)];
       playSuspenseNote(n, 2.5, 'sine', 0.05);
       step++;
     }, 1200);
   } else {
-    btn.textContent = '🎵 Music: OFF';
-    btn.classList.remove('playing');
+    if (btn) btn.textContent = 'Music: OFF';
     if (musicInterval) clearInterval(musicInterval);
   }
 }
 
-document.getElementById('btn-toggle-music').addEventListener('click', toggleSuspenseMusic);
+// Bind Settings tab interactions
+const btnSettingMusic = document.getElementById('btn-setting-music');
+if (btnSettingMusic) btnSettingMusic.addEventListener('click', toggleSuspenseMusic);
+
+const settingVol = document.getElementById('setting-volume');
+if (settingVol) {
+  settingVol.addEventListener('input', (e) => {
+    masterVolume = parseInt(e.target.value, 10) / 10;
+  });
+}
+
+const btnSettingSage = document.getElementById('btn-setting-sage');
+if (btnSettingSage) {
+  btnSettingSage.addEventListener('click', () => {
+    const sageWidget = document.getElementById('detective-sage');
+    const isHidden = sageWidget.style.display === 'none';
+    sageWidget.style.display = isHidden ? 'flex' : 'none';
+    btnSettingSage.textContent = isHidden ? 'Enabled' : 'Disabled';
+  });
+}
+
+const btnSettingDpad = document.getElementById('btn-setting-dpad');
+if (btnSettingDpad) {
+  btnSettingDpad.addEventListener('click', () => {
+    const dpad = document.querySelector('.scene-3d-dpad');
+    if (!dpad) return;
+    const isShown = dpad.style.display === 'flex';
+    dpad.style.display = isShown ? 'none' : 'flex';
+    btnSettingDpad.textContent = isShown ? 'Hidden' : 'Always On';
+  });
+}
+
+const settingReading = document.getElementById('setting-reading-level');
+if (settingReading) {
+  settingReading.addEventListener('change', (e) => {
+    state.readingLevel = e.target.value;
+    if (state.selectedCase) {
+      const bText = document.getElementById('briefing-text');
+      if (bText) {
+        bText.textContent = state.selectedCase.briefing[state.readingLevel] || state.selectedCase.briefing.general;
+      }
+    }
+  });
+}
 
 // ============================================================
 // DETECTIVE SAGE BARNABY (Hints & Companion)
@@ -717,82 +823,131 @@ function init3DSage() {
   const container = document.getElementById('sage-3d-canvas');
   if (!container || typeof THREE === 'undefined' || sageRenderer) return;
 
-  const w = 68, h = 68;
+  const w = 160, h = 160;
   sageScene = new THREE.Scene();
-  sageCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 20);
-  sageCamera.position.set(0, 0.4, 2.5);
-  sageCamera.lookAt(0, 0.1, 0);
+  sageCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 20);
+  sageCamera.position.set(0, 0.45, 2.7);
+  sageCamera.lookAt(0, 0.12, 0);
 
   sageRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   sageRenderer.setSize(w, h);
   sageRenderer.setClearColor(0x000000, 0);
   container.appendChild(sageRenderer.domElement);
 
-  // Lighting
-  const light = new THREE.DirectionalLight(0xffdfba, 1.6);
-  light.position.set(2, 3, 3);
-  const amb = new THREE.AmbientLight(0xffeedd, 0.6);
-  sageScene.add(light, amb);
+  // Noir Studio Lighting
+  const light = new THREE.DirectionalLight(0xffdfba, 1.8);
+  light.position.set(2.5, 3.5, 3);
+  const rimLight = new THREE.DirectionalLight(0xd4a017, 1.0);
+  rimLight.position.set(-2, 1, -1);
+  const amb = new THREE.AmbientLight(0xffeedd, 0.5);
+  sageScene.add(light, rimLight, amb);
 
   // Character Model (Inspector Bust)
   const sageGroup = new THREE.Group();
 
   // Trench coat / shoulders
   const coat = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.5, 0.7, 0.8, 12),
-    new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 })
+    new THREE.CylinderGeometry(0.55, 0.78, 0.85, 14),
+    new THREE.MeshStandardMaterial({ color: 0x423223, roughness: 0.85 })
   );
   coat.position.y = -0.55;
-  sageGroup.add(coat);
+  // White collar shirt + black tie
+  const shirt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.25, 0.35, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0xeee8d5 })
+  );
+  shirt.position.set(0, -0.22, 0.35);
+  const tie = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.3, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x1a1209 })
+  );
+  tie.position.set(0, -0.25, 0.42);
+  sageGroup.add(coat, shirt, tie);
 
   // Head group (rotates / nods)
   sageMeshHead = new THREE.Group();
   const face = new THREE.Mesh(
-    new THREE.SphereGeometry(0.36, 14, 14),
-    new THREE.MeshStandardMaterial({ color: 0xddb896, roughness: 0.7 })
+    new THREE.SphereGeometry(0.38, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xdcb48e, roughness: 0.65 })
   );
   sageMeshHead.add(face);
 
-  // Moustache
-  const moustache = new THREE.Mesh(
-    new THREE.BoxGeometry(0.32, 0.08, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0xdedede })
+  // Facial Details: Eyes, Eyebrows, Nose
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1f160b });
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+  eyeL.position.set(-0.12, 0.08, 0.34);
+  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), eyeMat);
+  eyeR.position.set(0.12, 0.08, 0.34);
+
+  const browMat = new THREE.MeshStandardMaterial({ color: 0x8a8075 });
+  const browL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.04), browMat);
+  browL.position.set(-0.12, 0.15, 0.34);
+  browL.rotation.z = 0.15;
+  const browR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.04), browMat);
+  browR.position.set(0.12, 0.15, 0.34);
+  browR.rotation.z = -0.15;
+
+  // Prominent Victorian Detective Nose
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.065, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xd0a57e, roughness: 0.7 })
   );
-  moustache.position.set(0, -0.06, 0.33);
-  sageMeshHead.add(moustache);
+  nose.position.set(0, 0.02, 0.4);
+  nose.rotation.x = -Math.PI / 8;
+
+  // Grey Bushy Moustache
+  const moustache = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, 0.09, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0xd6d6d6, roughness: 0.9 })
+  );
+  moustache.position.set(0, -0.07, 0.35);
+  sageMeshHead.add(eyeL, eyeR, browL, browR, nose, moustache);
 
   // Fedora Hat
   const brim = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.65, 0.65, 0.04, 14),
-    new THREE.MeshStandardMaterial({ color: 0x1f1912 })
+    new THREE.CylinderGeometry(0.72, 0.72, 0.045, 16),
+    new THREE.MeshStandardMaterial({ color: 0x1e1710, roughness: 0.8 })
   );
-  brim.position.y = 0.25;
+  brim.position.y = 0.28;
   const crown = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.35, 0.38, 0.35, 14),
-    new THREE.MeshStandardMaterial({ color: 0x1f1912 })
+    new THREE.CylinderGeometry(0.38, 0.42, 0.38, 16),
+    new THREE.MeshStandardMaterial({ color: 0x1e1710, roughness: 0.8 })
   );
-  crown.position.y = 0.42;
+  crown.position.y = 0.46;
   const ribbon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.36, 0.36, 0.08, 14),
+    new THREE.CylinderGeometry(0.39, 0.39, 0.09, 16),
     new THREE.MeshStandardMaterial({ color: 0xd4a017 })
   );
-  ribbon.position.y = 0.3;
+  ribbon.position.y = 0.34;
   sageMeshHead.add(brim, crown, ribbon);
 
-  // Detective Smoking Pipe
+  // Detective Smoking Cigar (Cylinder + Burning Glowing Ember)
   sageMeshPipe = new THREE.Group();
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8),
-    new THREE.MeshStandardMaterial({ color: 0x3d2714 })
+  const cigarBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.028, 0.24, 10),
+    new THREE.MeshStandardMaterial({ color: 0x4a2a16, roughness: 0.7 })
   );
-  stem.rotation.x = Math.PI / 3;
-  stem.position.set(0.12, -0.15, 0.32);
-  const bowl = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.04, 0.12, 8),
-    new THREE.MeshStandardMaterial({ color: 0x5a341b })
+  cigarBody.rotation.x = Math.PI / 2.3;
+  cigarBody.rotation.z = -Math.PI / 6;
+  cigarBody.position.set(0.12, -0.12, 0.36);
+
+  // Burning glowing red/orange ember tip
+  const cigarEmber = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.029, 0.029, 0.04, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff3300 })
   );
-  bowl.position.set(0.12, -0.08, 0.42);
-  sageMeshPipe.add(stem, bowl);
+  cigarEmber.rotation.x = Math.PI / 2.3;
+  cigarEmber.rotation.z = -Math.PI / 6;
+  cigarEmber.position.set(0.17, -0.14, 0.46);
+
+  // Dynamic Smoke particle rings
+  const smokePuff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xdedede, transparent: true, opacity: 0.45 })
+  );
+  smokePuff.position.set(0.18, -0.1, 0.49);
+
+  sageMeshPipe.add(cigarBody, cigarEmber, smokePuff);
   sageMeshHead.add(sageMeshPipe);
 
   sageGroup.add(sageMeshHead);
@@ -802,11 +957,17 @@ function init3DSage() {
   function animateSage() {
     requestAnimationFrame(animateSage);
     const t = Date.now() * 0.002;
-    // Thoughtful head sway and nod
+    // Contemplative detective head sway
     sageMeshHead.rotation.y = Math.sin(t) * 0.22;
     sageMeshHead.rotation.x = Math.sin(t * 0.6) * 0.08;
-    // Pipe subtle puff movement
-    sageMeshPipe.position.y = Math.sin(t * 2) * 0.015;
+
+    // Cigar ember glow pulse
+    cigarEmber.material.color.setRGB(1.0, 0.2 + Math.abs(Math.sin(t * 4)) * 0.4, 0.0);
+
+    // Rising animated cigar smoke
+    smokePuff.position.y = -0.1 + (Math.sin(t * 3) + 1) * 0.08;
+    smokePuff.scale.setScalar(1 + (Math.sin(t * 3) + 1) * 0.4);
+    smokePuff.material.opacity = 0.2 + Math.abs(Math.cos(t * 3)) * 0.35;
 
     sageRenderer.render(sageScene, sageCamera);
   }
@@ -831,6 +992,18 @@ sageClose.addEventListener('click', (e) => {
 sageAvatar.addEventListener('click', () => {
   generateSageHint();
 });
+
+const btnSageSettings = document.getElementById('btn-sage-settings');
+if (btnSageSettings) {
+  btnSageSettings.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // If not in investigation hub yet, enter investigation
+    if (!document.getElementById('screen-investigation').classList.contains('active')) {
+      showScreen('screen-investigation');
+    }
+    switchTab('settings');
+  });
+}
 
 function generateSageHint() {
   const c = state.selectedCase;

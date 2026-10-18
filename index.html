@@ -39,15 +39,12 @@
 <div id="screen-library" class="screen">
   <div class="screen-header">
     <button class="btn-back" id="btn-back-library">← Back</button>
-    <h2>CASE FILES</h2>
-    <div class="filter-bar">
-      <button class="filter-btn active" data-theme="all">All</button>
-      <button class="filter-btn" data-theme="classic">Classic</button>
-      <button class="filter-btn" data-theme="fraud">Fraud</button>
-      <button class="filter-btn" data-theme="heist">Heists</button>
-    </div>
+    <h2>DETECTIVE CAREER ROADMAP</h2>
   </div>
-  <div class="case-grid" id="case-grid"></div>
+  <div class="case-roadmap-wrap" id="case-roadmap-wrap">
+    <div class="roadmap-progress-summary" id="roadmap-progress-summary"></div>
+    <div class="roadmap-container" id="roadmap-container"></div>
+  </div>
 </div>
 
 <!-- SCREEN: CASE SETUP -->
@@ -96,6 +93,7 @@
     <button class="tab" data-tab="suspects">🎭 Suspects</button>
     <button class="tab" data-tab="notebook">📓 Notebook</button>
     <button class="tab" data-tab="board">🗓 Board</button>
+    <button class="tab" data-tab="settings">⚙ Settings</button>
   </div>
 
   <div class="inv-body">
@@ -185,6 +183,58 @@
         <button class="btn-secondary sm" id="btn-draw-link">Connect</button>
       </div>
     </div>
+
+    <!-- SETTINGS TAB -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="settings-card">
+        <h3>Game Settings</h3>
+        <p class="settings-sub">Configure audio, 3D graphics, reading level, and gameplay aids.</p>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-title">🎵 Suspense Music</span>
+            <span class="setting-desc">Atmospheric noir drone and suspense chords via Web Audio API.</span>
+          </div>
+          <button id="btn-setting-music" class="btn-secondary sm">Music: OFF</button>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-title">🔊 Sound Volume</span>
+            <span class="setting-desc">Adjust background drone and melody intensity.</span>
+          </div>
+          <input type="range" id="setting-volume" min="1" max="10" value="5" class="setting-slider">
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-title">🕵️ 3D Detective Sage Assistant</span>
+            <span class="setting-desc">Show Inspector Barnaby Sage in the corner with investigative hints.</span>
+          </div>
+          <button id="btn-setting-sage" class="btn-secondary sm">Enabled</button>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-title">🕹 Mobile 3D On-Screen D-Pad</span>
+            <span class="setting-desc">Always display virtual directional buttons for 3D exploration.</span>
+          </div>
+          <button id="btn-setting-dpad" class="btn-secondary sm">Auto (Touch)</button>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-title">📖 Reading Difficulty</span>
+            <span class="setting-desc">Switch briefing text complexity for the current case.</span>
+          </div>
+          <select id="setting-reading-level" class="setting-select">
+            <option value="kids">Kids (Simplified)</option>
+            <option value="general" selected>General (Standard)</option>
+            <option value="advanced">Advanced (Victorian Noir)</option>
+          </select>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="inv-footer">
@@ -232,11 +282,6 @@
   </div>
 </div>
 
-<!-- SUSPENSE MUSIC CONTROLLER -->
-<div class="audio-control-bar">
-  <button id="btn-toggle-music" class="audio-btn" title="Toggle Suspense Music">🎵 Music: OFF</button>
-</div>
-
 <!-- DETECTIVE SAGE WIDGET -->
 <div id="detective-sage" class="sage-widget">
   <div class="sage-speech" id="sage-speech">
@@ -246,9 +291,12 @@
     </div>
     <p id="sage-text">"Welcome, gumshoe. Need a tip? Click me anytime."</p>
   </div>
-  <div class="sage-avatar" id="sage-avatar" title="Ask Inspector Barnaby Sage for a hint">
-    <span class="sage-badge-indicator" id="sage-indicator">!</span>
-    <div id="sage-3d-canvas" class="sage-3d-canvas"></div>
+  <div class="sage-bottom-row">
+    <div class="sage-avatar" id="sage-avatar" title="Ask Inspector Barnaby Sage for a hint">
+      <span class="sage-badge-indicator" id="sage-indicator">!</span>
+      <div id="sage-3d-canvas" class="sage-3d-canvas"></div>
+    </div>
+    <button class="sage-settings-btn" id="btn-sage-settings" title="Open Settings">⚙</button>
   </div>
 </div>
 
