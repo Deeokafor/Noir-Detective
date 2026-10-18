@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noir Detective — start.ng</title>
+<meta name="description" content="A critical-thinking mystery game. Examine evidence, interrogate suspects, spot contradictions, and crack the case in 3–5 minutes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- PROFILE CARD (start.ng requirement) -->
+<div class="startng-card" id="player-card" hidden>
+  <img id="player-face" alt="">
+  <div>
+    <b id="player-name"></b>
+    <span id="player-account"></span>
+  </div>
+  <button id="player-sign-in" hidden>Sign in</button>
+</div>
+
+<!-- SCREEN: TITLE -->
+<div id="screen-title" class="screen active">
+  <div class="title-bg"></div>
+  <div class="title-content">
+    <div class="title-badge">A CRITICAL THINKING MYSTERY GAME</div>
+    <h1 class="game-title">NOIR<br><span>DETECTIVE</span></h1>
+    <p class="subtitle">Examine. Interrogate. Deduce. Solve.</p>
+    <button class="btn-primary" id="btn-start">OPEN THE CASE FILE</button>
+    <div class="credits">Cases drawn from public-domain detective fiction</div>
+  </div>
+</div>
+
+<!-- SCREEN: CASE LIBRARY -->
+<div id="screen-library" class="screen">
+  <div class="screen-header">
+    <button class="btn-back" id="btn-back-library">← Back</button>
+    <h2>CASE FILES</h2>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-theme="all">All</button>
+      <button class="filter-btn" data-theme="classic">Classic</button>
+      <button class="filter-btn" data-theme="fraud">Fraud</button>
+      <button class="filter-btn" data-theme="heist">Heists</button>
+    </div>
+  </div>
+  <div class="case-grid" id="case-grid"></div>
+</div>
+
+<!-- SCREEN: CASE SETUP -->
+<div id="screen-setup" class="screen">
+  <div class="case-folder" id="setup-folder">
+    <div class="folder-tab">CASE BRIEFING</div>
+    <div class="folder-body">
+      <div class="setup-badge" id="setup-theme"></div>
+      <h2 class="setup-title" id="setup-title"></h2>
+      <p class="setup-summary" id="setup-summary"></p>
+      <div class="difficulty-row">
+        <span>Difficulty:</span>
+        <span class="stars" id="setup-difficulty"></span>
+      </div>
+      <div class="level-select">
+        <div class="level-label">Reading Level:</div>
+        <div class="level-btns">
+          <button class="level-btn" data-level="kids">Kids</button>
+          <button class="level-btn active" data-level="general">General</button>
+          <button class="level-btn" data-level="advanced">Advanced</button>
+        </div>
+      </div>
+      <div class="setup-actions">
+        <button class="btn-secondary" id="btn-back-setup">← Cases</button>
+        <button class="btn-primary" id="btn-begin">BEGIN INVESTIGATION</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: INVESTIGATION HUB -->
+<div id="screen-investigation" class="screen">
+  <div class="inv-header">
+    <button class="btn-back sm" id="btn-abandon">Abandon</button>
+    <div class="case-title-bar" id="inv-case-title"></div>
+    <div class="inv-meta">
+      <div class="timer-box"><span class="timer-icon">⏱</span><span id="timer">0:00</span></div>
+      <div class="hint-box"><button class="btn-hint" id="btn-hint">💡 Hint (<span id="hint-cost">−50</span>)</button></div>
+    </div>
+  </div>
+
+  <div class="inv-tabs">
+    <button class="tab active" data-tab="briefing">📋 Briefing</button>
+    <button class="tab" data-tab="evidence">🔍 Evidence</button>
+    <button class="tab" data-tab="suspects">🎭 Suspects</button>
+    <button class="tab" data-tab="notebook">📓 Notebook</button>
+    <button class="tab" data-tab="board">🗓 Board</button>
+  </div>
+
+  <div class="inv-body">
+    <!-- BRIEFING TAB -->
+    <div class="tab-panel active" id="tab-briefing">
+      <div class="paper-panel" id="briefing-text"></div>
+      <div class="suspect-intro" id="suspect-intro-list"></div>
+    </div>
+
+    <!-- EVIDENCE TAB -->
+    <div class="tab-panel" id="tab-evidence">
+      <div class="evidence-grid" id="evidence-grid"></div>
+      <div class="evidence-detail hidden" id="evidence-detail">
+        <button class="close-btn" id="close-evidence">✕</button>
+        <h3 id="ev-title"></h3>
+        <p id="ev-desc"></p>
+        <button class="btn-secondary sm" id="ev-locker-btn">Add to Locker</button>
+      </div>
+    </div>
+
+    <!-- SUSPECTS TAB -->
+    <div class="tab-panel" id="tab-suspects">
+      <div class="suspect-list" id="suspect-list"></div>
+      <div class="interview-panel hidden" id="interview-panel">
+        <div class="interview-header">
+          <span class="suspect-name-badge" id="interview-name"></span>
+          <button class="close-btn" id="close-interview">✕</button>
+        </div>
+        <div class="dialogue" id="dialogue-box"></div>
+        <div class="question-list" id="question-list"></div>
+      </div>
+    </div>
+
+    <!-- NOTEBOOK TAB -->
+    <div class="tab-panel" id="tab-notebook">
+      <p class="notebook-intro">Review logged clues and statements. Flag contradictions.</p>
+      <div class="notebook-entries" id="notebook-entries"></div>
+      <div class="contradiction-zone">
+        <h4>Flag a Contradiction</h4>
+        <p class="hint-text">Select two entries that conflict:</p>
+        <div class="contra-selects">
+          <select id="contra-a"></select>
+          <select id="contra-b"></select>
+          <button class="btn-secondary sm" id="btn-flag-contra">Flag It</button>
+        </div>
+        <div id="contra-feedback"></div>
+      </div>
+    </div>
+
+    <!-- BOARD TAB -->
+    <div class="tab-panel" id="tab-board">
+      <p class="board-intro">Your deduction board. Click any two suspects or clues to draw a connection.</p>
+      <div class="board-canvas" id="board-canvas">
+        <div class="board-nodes" id="board-nodes"></div>
+        <div class="board-links" id="board-links"></div>
+      </div>
+      <div class="board-controls">
+        <select id="link-a"></select>
+        <select id="link-type">
+          <option value="supports">Supports</option>
+          <option value="contradicts">Contradicts</option>
+          <option value="motive">Suggests Motive</option>
+        </select>
+        <select id="link-b"></select>
+        <button class="btn-secondary sm" id="btn-draw-link">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="inv-footer">
+    <button class="btn-primary accuse-btn" id="btn-accuse">⚖ Make Accusation</button>
+  </div>
+</div>
+
+<!-- SCREEN: ACCUSATION -->
+<div id="screen-accusation" class="screen">
+  <div class="case-folder">
+    <div class="folder-tab">ACCUSATION FORM</div>
+    <div class="folder-body">
+      <h3>Who committed the crime?</h3>
+      <select class="big-select" id="accuse-suspect"></select>
+
+      <h3>Select your evidence <span class="hint-text">(cite at least 1)</span></h3>
+      <div class="evidence-checklist" id="evidence-checklist"></div>
+
+      <div class="accuse-actions">
+        <button class="btn-secondary" id="btn-back-accuse">← Back</button>
+        <button class="btn-primary" id="btn-submit-accuse">SUBMIT ACCUSATION</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: VERDICT -->
+<div id="screen-verdict" class="screen">
+  <div class="verdict-panel">
+    <div class="verdict-stamp" id="verdict-stamp"></div>
+    <h2 id="verdict-title"></h2>
+    <p id="verdict-msg"></p>
+    <div class="score-breakdown" id="score-breakdown"></div>
+    <div class="debrief-section">
+      <h4>🗞 The Real Story</h4>
+      <p id="debrief-text"></p>
+      <small id="source-credit"></small>
+    </div>
+    <div class="leaderboard-section">
+      <h4>🏆 Leaderboard</h4>
+      <ol id="leaderboard-list"></ol>
+      <div id="score-save-msg"></div>
+    </div>
+    <button class="btn-primary" id="btn-play-again">Next Case</button>
+  </div>
+</div>
+
+<!-- SUSPENSE MUSIC CONTROLLER -->
+<div class="audio-control-bar">
+  <button id="btn-toggle-music" class="audio-btn" title="Toggle Suspense Music">🎵 Music: OFF</button>
+</div>
+
+<!-- DETECTIVE SAGE WIDGET -->
+<div id="detective-sage" class="sage-widget">
+  <div class="sage-speech" id="sage-speech">
+    <div class="sage-speech-header">
+      <span class="sage-name">Sage Barnaby</span>
+      <button class="sage-close" id="sage-close-speech" title="Dismiss">✕</button>
+    </div>
+    <p id="sage-text">"Welcome, gumshoe. Need a tip? Click me anytime."</p>
+  </div>
+  <div class="sage-avatar" id="sage-avatar" title="Ask Detective Sage for a hint">
+    <span class="sage-badge-indicator" id="sage-indicator">!</span>
+    🕵️‍♂️
+  </div>
+</div>
+
+<script src="cases.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

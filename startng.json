@@ -1,0 +1,8 @@
+{
+  "leaderboard": {
+    "stats": [
+      { "key": "score", "label": "Total Score", "order": "highest" },
+      { "key": "cases", "label": "Cases Solved", "order": "highest" }
+    ]
+  }
+}

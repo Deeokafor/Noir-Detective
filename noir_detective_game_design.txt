@@ -1,0 +1,392 @@
+==============================================================================
+NOIR DETECTIVE: A CRITICAL THINKING MYSTERY GAME
+Design and Flow Document (working title)
+==============================================================================
+
+Status: Draft v1, based on decisions made in planning conversation
+Platform: Web browsers
+Hosting / tech stack: Intentionally left open for now
+
+
+------------------------------------------------------------------------------
+1. OVERVIEW
+------------------------------------------------------------------------------
+
+A browser-based detective game that builds critical thinking and reading
+comprehension. Players take on short mystery cases (3-5 minutes each) drawn
+from public-domain detective fiction and real, non-violent solved cases.
+They examine evidence, interview suspects, catch contradictions, connect
+clues, and make a final accusation backed by cited evidence. Scores feed a
+global, all-time leaderboard.
+
+Design pillars
+  1. Reasoning over guessing: points reward HOW you solved it, not only
+     whether you named the right suspect.
+  2. Real roots: every case is anchored in a real story or real solved case.
+     The solution is never invented.
+  3. Short and replayable: one case fits in a coffee break.
+  4. Welcoming to all ages: selectable reading level, non-graphic content,
+     age-aware privacy.
+  5. Fair competition: the leaderboard accounts for difficulty and reading
+     level, and scoring is verified server-side.
+
+
+------------------------------------------------------------------------------
+2. AUDIENCE
+------------------------------------------------------------------------------
+
+All ages. Three reading levels adapt the same case:
+  - Kids:     short sentences, simple vocabulary, gentler framing
+  - General:  everyday adult reading level
+  - Advanced: richer vocabulary, subtler clues, more ambiguity
+
+Reading level is chosen by the player before each case and can be changed
+in settings.
+
+
+------------------------------------------------------------------------------
+3. CORE GAME LOOP
+------------------------------------------------------------------------------
+
+  Pick a case --> Choose reading level --> Briefing --> Investigate
+  (evidence, interviews, contradictions, deduction board) --> Accuse with
+  cited evidence --> Reveal and score --> Real-case debrief --> Leaderboard
+  --> Pick the next case
+
+Target length per case: 3-5 minutes.
+
+
+------------------------------------------------------------------------------
+4. CASE LIBRARY AND CONTENT RULES
+------------------------------------------------------------------------------
+
+4.1 Launch library
+  - 10 cases at launch (proof of concept)
+  - Players can pick any case from the library at any time
+  - Cases are grouped by theme (see 4.3)
+
+4.2 Allowed sources
+  - Public-domain detective fiction (for example Sherlock Holmes, Poe,
+    Chesterton)
+  - Historical solved cases based on public records
+  - Non-violent real cases (fraud, theft, art heists, espionage)
+
+4.3 Themes
+  Players choose a theme to filter the library. Suggested starting themes:
+    - Classic Detective Fiction
+    - Art and Heists
+    - Fraud and Forgery
+    - Espionage and Secrets
+    - Historical Puzzles
+  (Final theme list to be set once the 10 launch cases are chosen.)
+
+4.4 Content safety rules
+  - No graphic or violent real cases. Real cases involving violence against
+    real victims are excluded.
+  - Fiction may be mysterious or tense but stays non-graphic at every
+    reading level.
+  - Every case carries a source credit (story, author, or historical record).
+
+4.5 AI adaptation rules
+  The AI adapts each case live when a player starts it. It MAY:
+    - Rewrite narration and clues at the chosen reading level
+    - Add fictional suspects, witnesses and red herrings
+    - Generate suspect dialogue consistent with the case facts
+  It MUST NOT:
+    - Change the real solution or the key real facts of the case
+    - Introduce details that make the solution ambiguous or unsolvable
+    - Add graphic or inappropriate content
+
+4.6 Case "answer key" (per case, stored server-side)
+  Each case has a verified master record containing:
+    - The true culprit / solution
+    - The set of essential clues that prove the solution
+    - Known contradictions that must be catchable
+    - Facts the AI may not alter
+  The AI-adapted version is validated against this record before play
+  (see section 11, Validation).
+
+
+------------------------------------------------------------------------------
+5. PLAYER ACTIONS (GAMEPLAY MECHANICS)
+------------------------------------------------------------------------------
+
+5.1 Examine Evidence
+  - The player inspects clues (documents, objects, locations, notes).
+  - Each clue goes into the Evidence Locker with a short description.
+  - Some clues are essential, some are red herrings.
+
+5.2 Interview Suspects
+  - Dialogue-choice interviews. Each suspect has a statement and
+    can answer several questions.
+  - Choices reveal new information, and some may only be asked once.
+  - Statements are logged in a Case Notebook for later comparison.
+
+5.3 Spot Contradictions
+  - The player can flag two items (statement vs. statement, or statement
+    vs. evidence) as contradictory.
+  - Correct flags reward points and often unlock new leads.
+  - Incorrect flags cost a small penalty, which discourages random guessing.
+
+5.4 Deduction Board
+  - A visual board where the player links clues, statements and suspects
+    ("this alibi conflicts with that receipt").
+  - Links can be labeled (supports / contradicts / suggests motive).
+  - The board is the player's reasoning map and feeds the reasoning score.
+
+5.5 Final Accusation
+  - The player names the culprit and selects the specific evidence that
+    supports the accusation (cited evidence).
+  - The accusation is checked against the case's answer key.
+  - Right suspect with weak evidence scores lower than right suspect with
+    strong evidence.
+
+5.6 Hints
+  - Hints are always available and free to request, but each one costs
+    points.
+  - Hint tiers escalate: a nudge, then a direction, then a strong pointer.
+  - Each tier costs more than the last.
+
+
+------------------------------------------------------------------------------
+6. SCREEN FLOW
+------------------------------------------------------------------------------
+
+  [Landing / Title]
+        |
+        v
+  [Sign in or Play as Guest]  --> [Age check on account creation]
+        |
+        v
+  [Case Library]  (filter by theme, difficulty, completed)
+        |
+        v
+  [Case Setup]  (choose reading level, see case summary, best score)
+        |
+        v
+  [Loading]  (AI adapts the case; "Dealing the cards...")
+        |
+        v
+  [Briefing]  (setting, victim/crime, suspects introduced)
+        |
+        v
+  [Investigation Hub]  <-----------------------------+
+     |        |           |            |             |
+     v        v           v            v             |
+  [Evidence] [Interviews] [Notebook] [Deduction   ]--+
+                                       [Board      ]
+        |
+        v  (when the player is ready)
+  [Accusation Screen]  (pick culprit + cite evidence)
+        |
+        v
+  [Verdict / Reveal]  (right or wrong, the true story unfolds)
+        |
+        v
+  [Score Breakdown]  (points, reasoning strengths, badges earned)
+        |
+        v
+  [Real-Case Debrief]  (what really happened, source credit)
+        |
+        v
+  [Leaderboard]  -->  [Back to Case Library]
+
+Persistent UI during a case: timer, hint button, notebook shortcut.
+
+
+------------------------------------------------------------------------------
+7. SCORING
+------------------------------------------------------------------------------
+
+7.1 Score components
+  1. Correct solution:    largest component. Right culprit named.
+  2. Reasoning quality:   evidence cited correctly in the accusation,
+                          contradictions correctly flagged, useful links on
+                          the deduction board.
+  3. Speed:               time bonus. Capped, so reading carefully is never
+                          punished too harshly.
+  4. Hints:               deduction per hint, escalating by hint tier.
+  5. Penalties:           incorrect contradiction flags, wrong accusation.
+
+7.2 Normalization
+  Raw scores are adjusted so different cases, reading levels and difficulty
+  levels are comparable:
+    - Each case has a difficulty rating (Easy / Medium / Hard)
+    - Each reading level has a multiplier
+    - Final leaderboard score = raw score x difficulty multiplier x
+      reading-level multiplier
+  The scoring weights and multipliers need playtesting. The structure above
+  is the proposal and the numbers are not final.
+
+7.3 Rule for reading levels
+  Multipliers should reward challenge fairly without making the Kids level
+  feel like a lesser tier. Kids-level players should still be able to rank
+  well among their peers (see 8.3).
+
+
+------------------------------------------------------------------------------
+8. LEADERBOARD
+------------------------------------------------------------------------------
+
+8.1 Type
+  Global, all-time.
+
+8.2 What is ranked
+  - Overall leaderboard: total normalized score across all cases
+  - Per-case view: best normalized score for each case
+
+8.3 Fairness options to consider
+  - Filter by reading level so players can compare against peers
+  - Optional filters: theme, difficulty
+
+8.4 Display
+  Rank, nickname, total score, cases solved, top badge. Nicknames only are
+  shown publicly. Emails are never displayed.
+
+8.5 Integrity
+  See section 10 (Anti-Cheat).
+
+
+------------------------------------------------------------------------------
+9. ACCOUNTS, PRIVACY AND SAFETY
+------------------------------------------------------------------------------
+
+9.1 Sign-in options
+  - Nickname-only play
+  - Email sign-in (optional)
+
+9.2 Age check
+  - Age is requested at sign-up and the experience adjusts accordingly.
+  - Under 13: nickname only, no email or other personal data collected, no
+    free-text input shared publicly. (Designed to align with children's
+    privacy rules such as COPPA. Legal review is recommended before launch.)
+  - 13 and over: email sign-in available.
+
+9.3 Nickname moderation
+  - Profanity and abuse filter on nicknames
+  - Report / remove mechanism for inappropriate names
+  - Players under 13 pick from approved name parts instead of typing free
+    text (suggested approach, e.g. "Clever" + "Fox")
+
+9.4 Data minimization
+  Collect only what is needed: nickname, optional email, age bracket, scores.
+
+
+------------------------------------------------------------------------------
+10. ANTI-CHEAT AND SCORE INTEGRITY
+------------------------------------------------------------------------------
+
+Principle: the browser never decides the result.
+
+  - The answer key and true solution stay on the server and are never sent
+    to the player's browser.
+  - Accusations are checked server-side.
+  - The server measures time itself and calculates the score from logged
+    player actions. The browser sends actions, not scores.
+  - Rate limiting on game starts, hint requests and score submissions.
+  - Basic anomaly flags (impossibly fast solves, repeated perfect runs on
+    new cases).
+  - Nickname filtering (see 9.3).
+
+
+------------------------------------------------------------------------------
+11. AI CASE ADAPTATION PIPELINE
+------------------------------------------------------------------------------
+
+Per game start:
+
+  1. Player selects a case and a reading level.
+  2. Server loads the case's verified master record (facts, solution,
+     essential clues, contradictions, source).
+  3. The AI generates the playable version: narration, clue text,
+     fictional suspects and red herrings, and interview dialogue, all at the
+     chosen reading level.
+  4. Validation before play:
+       - Real solution unchanged
+       - All essential clues present
+       - Required contradictions still discoverable
+       - Fictional additions do not create a second plausible culprit
+       - Content check against the safety rules (section 4.4)
+  5. If validation fails: regenerate, or fall back to a pre-approved
+     version of the case so the player is never left stuck.
+  6. Player plays the validated version. The server holds the answer key.
+
+Recommended safety net: keep a reviewed fallback version of each of the
+10 launch cases.
+
+Cost control (open item): a free daily play limit is the suggested
+starting point. Final approach to be decided.
+
+
+------------------------------------------------------------------------------
+12. FEEDBACK AND PROGRESSION
+------------------------------------------------------------------------------
+
+12.1 After each case
+  - Total score with a clear breakdown
+  - Reasoning strengths, for example:
+        Evidence Use ........ how well cited evidence supported the claim
+        Contradiction Spotting ... correct vs. incorrect flags
+        Questioning ......... useful interview choices made
+        Connecting the Dots ... quality of deduction board links
+  - A short, encouraging tip on the weakest area
+  - The Real-Case Debrief: what really happened, with source credit
+
+12.2 Progress over time
+  - Skill meters for each reasoning strength
+  - Badges (examples: "Sharp Eye" for catching all contradictions,
+    "No Hints Needed", "Case Closed in Record Time")
+  - Daily play streaks
+  - History of completed cases and best scores
+
+12.3 Purpose
+  Players should see their critical thinking improving, not just their rank.
+
+
+------------------------------------------------------------------------------
+13. LOOK, FEEL AND AUDIO
+------------------------------------------------------------------------------
+
+Visual style: vintage noir. Think black-and-white with warm amber accents,
+typewriter and case-file typography, paper textures, case folders, corkboard
+for the deduction board.
+
+Audio: noir-style ambient music and sound effects (pages turning, stamps,
+typewriter clicks). Include a simple mute toggle.
+
+Note: Accessibility features (screen reader support, dyslexia-friendly
+font, colorblind-safe palette) were not selected, but are recommended for an
+all-ages audience. Worth revisiting.
+
+
+------------------------------------------------------------------------------
+14. OPEN ITEMS
+------------------------------------------------------------------------------
+
+  1. AI cost control (daily play limit suggested)
+  2. Accessibility features
+  3. Hosting and tech stack (deliberately deferred)
+  4. Final theme list and the 10 launch cases
+  5. Scoring weights and difficulty/reading-level multipliers (need
+     playtesting)
+  6. Legal review of children's privacy handling and of the use of each
+     real case's source material
+  7. Handling for players who get stuck or run out of time
+  8. How "reasoning quality" is judged (rule-based checks against the
+     answer key vs. AI-assisted evaluation)
+
+
+------------------------------------------------------------------------------
+15. SUGGESTED NEXT STEPS
+------------------------------------------------------------------------------
+
+  1. Choose and research the 10 launch cases and build each case's
+     master record (facts, solution, essential clues, contradictions).
+  2. Prototype one full case end-to-end (briefing through score).
+  3. Playtest scoring with a small group across all three reading levels.
+  4. Build the leaderboard and server-side scoring.
+  5. Expand to the full 10-case library and polish visuals and audio.
+
+==============================================================================
+END OF DOCUMENT
+==============================================================================
