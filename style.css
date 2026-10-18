@@ -586,18 +586,26 @@ html, body {
   pointer-events: none;
 }
 .sage-avatar {
-  width: 54px; height: 54px; border-radius: 50%;
-  background: #23190e; border: 2px solid var(--amber);
+  width: 72px; height: 72px; border-radius: 50%;
+  background: #1b130a; border: 2px solid var(--amber);
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px; cursor: pointer;
+  cursor: pointer;
   pointer-events: auto;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.6), 0 0 12px var(--amber-glow);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.7), 0 0 16px var(--amber-glow);
   position: relative;
+  overflow: visible;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   user-select: none;
 }
-.sage-avatar:hover { transform: scale(1.1); }
+.sage-avatar:hover { transform: scale(1.08); }
 .sage-avatar:active { transform: scale(0.95); }
+.sage-3d-canvas {
+  width: 68px; height: 68px; border-radius: 50%;
+  overflow: hidden; pointer-events: none;
+}
+.sage-3d-canvas canvas {
+  width: 100% !important; height: 100% !important; display: block;
+}
 .sage-badge-indicator {
   position: absolute; top: -3px; right: -3px;
   background: var(--amber-light); color: var(--ink);

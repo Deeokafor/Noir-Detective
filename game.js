@@ -710,10 +710,117 @@ const sageAvatar = document.getElementById('sage-avatar');
 const sageClose = document.getElementById('sage-close-speech');
 const sageIndicator = document.getElementById('sage-indicator');
 
+// 3D Animated Inspector Barnaby Sage
+let sageScene, sageCamera, sageRenderer, sageMeshHead, sageMeshPipe;
+
+function init3DSage() {
+  const container = document.getElementById('sage-3d-canvas');
+  if (!container || typeof THREE === 'undefined' || sageRenderer) return;
+
+  const w = 68, h = 68;
+  sageScene = new THREE.Scene();
+  sageCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 20);
+  sageCamera.position.set(0, 0.4, 2.5);
+  sageCamera.lookAt(0, 0.1, 0);
+
+  sageRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  sageRenderer.setSize(w, h);
+  sageRenderer.setClearColor(0x000000, 0);
+  container.appendChild(sageRenderer.domElement);
+
+  // Lighting
+  const light = new THREE.DirectionalLight(0xffdfba, 1.6);
+  light.position.set(2, 3, 3);
+  const amb = new THREE.AmbientLight(0xffeedd, 0.6);
+  sageScene.add(light, amb);
+
+  // Character Model (Inspector Bust)
+  const sageGroup = new THREE.Group();
+
+  // Trench coat / shoulders
+  const coat = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.7, 0.8, 12),
+    new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.8 })
+  );
+  coat.position.y = -0.55;
+  sageGroup.add(coat);
+
+  // Head group (rotates / nods)
+  sageMeshHead = new THREE.Group();
+  const face = new THREE.Mesh(
+    new THREE.SphereGeometry(0.36, 14, 14),
+    new THREE.MeshStandardMaterial({ color: 0xddb896, roughness: 0.7 })
+  );
+  sageMeshHead.add(face);
+
+  // Moustache
+  const moustache = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.08, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xdedede })
+  );
+  moustache.position.set(0, -0.06, 0.33);
+  sageMeshHead.add(moustache);
+
+  // Fedora Hat
+  const brim = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.65, 0.65, 0.04, 14),
+    new THREE.MeshStandardMaterial({ color: 0x1f1912 })
+  );
+  brim.position.y = 0.25;
+  const crown = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.38, 0.35, 14),
+    new THREE.MeshStandardMaterial({ color: 0x1f1912 })
+  );
+  crown.position.y = 0.42;
+  const ribbon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.36, 0.36, 0.08, 14),
+    new THREE.MeshStandardMaterial({ color: 0xd4a017 })
+  );
+  ribbon.position.y = 0.3;
+  sageMeshHead.add(brim, crown, ribbon);
+
+  // Detective Smoking Pipe
+  sageMeshPipe = new THREE.Group();
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3d2714 })
+  );
+  stem.rotation.x = Math.PI / 3;
+  stem.position.set(0.12, -0.15, 0.32);
+  const bowl = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.04, 0.12, 8),
+    new THREE.MeshStandardMaterial({ color: 0x5a341b })
+  );
+  bowl.position.set(0.12, -0.08, 0.42);
+  sageMeshPipe.add(stem, bowl);
+  sageMeshHead.add(sageMeshPipe);
+
+  sageGroup.add(sageMeshHead);
+  sageScene.add(sageGroup);
+
+  // Idle animation loop
+  function animateSage() {
+    requestAnimationFrame(animateSage);
+    const t = Date.now() * 0.002;
+    // Thoughtful head sway and nod
+    sageMeshHead.rotation.y = Math.sin(t) * 0.22;
+    sageMeshHead.rotation.x = Math.sin(t * 0.6) * 0.08;
+    // Pipe subtle puff movement
+    sageMeshPipe.position.y = Math.sin(t * 2) * 0.015;
+
+    sageRenderer.render(sageScene, sageCamera);
+  }
+  animateSage();
+}
+
 function speakSage(text) {
   sageText.textContent = text;
   sageSpeech.classList.remove('hidden');
   sageIndicator.style.display = 'none';
+  // Expressive nod when speaking
+  if (sageMeshHead) {
+    sageMeshHead.rotation.x = 0.25;
+  }
 }
 
 sageClose.addEventListener('click', (e) => {
@@ -722,11 +829,7 @@ sageClose.addEventListener('click', (e) => {
 });
 
 sageAvatar.addEventListener('click', () => {
-  if (sageSpeech.classList.contains('hidden')) {
-    generateSageHint();
-  } else {
-    generateSageHint();
-  }
+  generateSageHint();
 });
 
 function generateSageHint() {
@@ -1062,5 +1165,6 @@ function interactWithCurrentTarget() {
 // ============================================================
 (async () => {
   await loadPlayer();
+  init3DSage();
   showScreen('screen-title');
 })();
