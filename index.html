@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
@@ -89,7 +90,8 @@
   </div>
 
   <div class="inv-tabs">
-    <button class="tab active" data-tab="briefing">📋 Briefing</button>
+    <button class="tab active" data-tab="scene3d">🕹 Crime Scene (3D)</button>
+    <button class="tab" data-tab="briefing">📋 Briefing</button>
     <button class="tab" data-tab="evidence">🔍 Evidence</button>
     <button class="tab" data-tab="suspects">🎭 Suspects</button>
     <button class="tab" data-tab="notebook">📓 Notebook</button>
@@ -97,8 +99,30 @@
   </div>
 
   <div class="inv-body">
+    <!-- 3D SCENE TAB -->
+    <div class="tab-panel active" id="tab-scene3d">
+      <div class="scene-3d-wrap">
+        <div class="scene-3d-instructions">
+          <span>Use <b>W/A/S/D</b> or <b>Arrow Keys</b> to walk. Walk close to glowing suspect markers and clue pedestals to inspect them!</span>
+        </div>
+        <div id="three-canvas-container" class="three-canvas-container"></div>
+        <div class="scene-3d-hud" id="scene-3d-hud">
+          <div class="hud-target-name" id="hud-target-name">Move closer to investigate</div>
+          <button class="btn-primary sm" id="btn-scene-interact" style="display:none;">Examine [SPACE / ENTER]</button>
+        </div>
+        <div class="scene-3d-dpad">
+          <button class="dpad-btn up" id="dpad-up">▲</button>
+          <div class="dpad-mid">
+            <button class="dpad-btn left" id="dpad-left">◀</button>
+            <button class="dpad-btn down" id="dpad-down">▼</button>
+            <button class="dpad-btn right" id="dpad-right">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- BRIEFING TAB -->
-    <div class="tab-panel active" id="tab-briefing">
+    <div class="tab-panel" id="tab-briefing">
       <div class="paper-panel" id="briefing-text"></div>
       <div class="suspect-intro" id="suspect-intro-list"></div>
     </div>

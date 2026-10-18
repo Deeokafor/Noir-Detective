@@ -223,8 +223,8 @@ function startInvestigation() {
     }
   }, 1000);
 
-  // Activate briefing tab
-  switchTab('briefing');
+  // Activate 3D crime scene tab by default
+  switchTab('scene3d');
   showScreen('screen-investigation');
 }
 
@@ -236,6 +236,9 @@ document.querySelectorAll('.tab').forEach(tab => {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+  if (name === 'scene3d') {
+    initOrUpdate3DScene();
+  }
 }
 
 // ABANDON
@@ -754,6 +757,303 @@ function generateSageHint() {
   } else {
     const randomTip = tips[Math.floor(Math.random() * tips.length)];
     speakSage(randomTip);
+  }
+}
+
+// ============================================================
+// THREE.JS 3D FINITE CRIME SCENE & DETECTIVE CONTROLLER
+// ============================================================
+let scene3D, camera3D, renderer3D;
+let detectiveMesh, detectiveHat;
+let interactiveObjects = [];
+let keysPressed = {};
+let sceneInitialized = false;
+let currentNearbyTarget = null;
+const ROOM_LIMIT = 11; // finite boundary [-11, 11]
+
+function initOrUpdate3DScene() {
+  const container = document.getElementById('three-canvas-container');
+  if (!container || typeof THREE === 'undefined') return;
+
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 420;
+
+  if (!sceneInitialized) {
+    scene3D = new THREE.Scene();
+    scene3D.background = new THREE.Color(0x0a0704);
+    scene3D.fog = new THREE.FogExp2(0x0a0704, 0.035);
+
+    camera3D = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    camera3D.position.set(0, 15, 17);
+    camera3D.lookAt(0, 0, 0);
+
+    renderer3D = new THREE.WebGLRenderer({ antialias: true });
+    renderer3D.setSize(width, height);
+    renderer3D.shadowMap.enabled = true;
+    container.innerHTML = '';
+    container.appendChild(renderer3D.domElement);
+
+    // Noir Lighting
+    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.4);
+    scene3D.add(ambientLight);
+
+    const streetLamp = new THREE.PointLight(0xd4a017, 1.8, 30);
+    streetLamp.position.set(0, 10, 0);
+    streetLamp.castShadow = true;
+    scene3D.add(streetLamp);
+
+    // Finite Floor (Room / Alley)
+    const floorGeo = new THREE.PlaneGeometry(ROOM_LIMIT * 2, ROOM_LIMIT * 2);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x181410, roughness: 0.85 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene3D.add(floor);
+
+    // Finite Border Walls (Noir cobblestone boundary)
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x241c14, roughness: 0.9 });
+    const wallThick = 0.5, wallH = 2.5;
+    
+    // North, South, East, West walls
+    const wN = new THREE.Mesh(new THREE.BoxGeometry(ROOM_LIMIT * 2 + 1, wallH, wallThick), wallMat);
+    wN.position.set(0, wallH / 2, -ROOM_LIMIT);
+    const wS = new THREE.Mesh(new THREE.BoxGeometry(ROOM_LIMIT * 2 + 1, wallH, wallThick), wallMat);
+    wS.position.set(0, wallH / 2, ROOM_LIMIT);
+    const wE = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, ROOM_LIMIT * 2 + 1), wallMat);
+    wE.position.set(ROOM_LIMIT, wallH / 2, 0);
+    const wW = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, ROOM_LIMIT * 2 + 1), wallMat);
+    wW.position.set(-ROOM_LIMIT, wallH / 2, 0);
+    scene3D.add(wN, wS, wE, wW);
+
+    // Detective Character (Trench coat + Fedora hat)
+    detectiveMesh = new THREE.Group();
+    const coatMat = new THREE.MeshStandardMaterial({ color: 0x7c6241 }); // Khaki trenchcoat
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 1.6, 12), coatMat);
+    body.position.y = 0.8;
+    body.castShadow = true;
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 12), new THREE.MeshStandardMaterial({ color: 0xe0c8b0 }));
+    head.position.y = 1.9;
+
+    detectiveHat = new THREE.Group();
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.05, 12), new THREE.MeshStandardMaterial({ color: 0x2b2216 }));
+    brim.position.y = 2.15;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 0.4, 12), new THREE.MeshStandardMaterial({ color: 0x2b2216 }));
+    crown.position.y = 2.35;
+    detectiveHat.add(brim, crown);
+
+    detectiveMesh.add(body, head, detectiveHat);
+    detectiveMesh.position.set(0, 0, 4);
+    scene3D.add(detectiveMesh);
+
+    // Movement Key Listeners
+    window.addEventListener('keydown', (e) => {
+      keysPressed[e.key.toLowerCase()] = true;
+      if ((e.code === 'Space' || e.key === 'Enter') && currentNearbyTarget) {
+        interactWithCurrentTarget();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      keysPressed[e.key.toLowerCase()] = false;
+    });
+
+    // Touch/Mobile D-Pad
+    const setupDpad = (id, key) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('pointerdown', () => { keysPressed[key] = true; });
+      el.addEventListener('pointerup', () => { keysPressed[key] = false; });
+      el.addEventListener('pointerleave', () => { keysPressed[key] = false; });
+    };
+    setupDpad('dpad-up', 'arrowup');
+    setupDpad('dpad-down', 'arrowdown');
+    setupDpad('dpad-left', 'arrowleft');
+    setupDpad('dpad-right', 'arrowright');
+
+    document.getElementById('btn-scene-interact').addEventListener('click', interactWithCurrentTarget);
+
+    window.addEventListener('resize', () => {
+      if (!renderer3D || !container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera3D.aspect = w / h;
+      camera3D.updateProjectionMatrix();
+      renderer3D.setSize(w, h);
+    });
+
+    sceneInitialized = true;
+    animate3DScene();
+  }
+
+  // Populate or re-populate case objects (Suspects & Evidence)
+  buildCrimeSceneObjects();
+}
+
+function buildCrimeSceneObjects() {
+  const c = state.selectedCase;
+  if (!c || !scene3D) return;
+
+  // Clear existing interactive objects
+  interactiveObjects.forEach(obj => scene3D.remove(obj.mesh));
+  interactiveObjects = [];
+
+  // Place suspects around the room perimeter
+  const suspects = c.suspects || [];
+  suspects.forEach((s, idx) => {
+    const angle = (idx / suspects.length) * Math.PI * 0.9 + 0.1;
+    const radius = 8;
+    const x = Math.cos(angle) * radius * (idx % 2 === 0 ? 1 : -1);
+    const z = -Math.sin(angle) * radius;
+
+    const group = new THREE.Group();
+    // Suspect marker silhouette
+    const sMat = new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.5, emissive: 0x220505 });
+    const sBody = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.7, 12), sMat);
+    sBody.position.y = 0.85;
+    const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), sMat);
+    sHead.position.y = 1.9;
+    
+    // Glowing ring beacon on the ground
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 0.9, 16),
+      new THREE.MeshBasicMaterial({ color: 0xd4a017, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+
+    group.add(sBody, sHead, ring);
+    group.position.set(x, 0, z);
+    scene3D.add(group);
+
+    interactiveObjects.push({
+      type: 'suspect',
+      data: s,
+      mesh: group,
+      name: `${s.emoji} Suspect: ${s.name} (${s.role})`
+    });
+  });
+
+  // Place evidence items on pedestals
+  const evidenceList = c.evidence || [];
+  evidenceList.forEach((ev, idx) => {
+    const angle = (idx / evidenceList.length) * Math.PI * 1.5;
+    const radius = 4.5;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius * 0.7 - 1;
+
+    const group = new THREE.Group();
+    // Pedestal
+    const ped = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.55, 0.9, 12),
+      new THREE.MeshStandardMaterial({ color: 0x292116 })
+    );
+    ped.position.y = 0.45;
+
+    // Glowing clue orb
+    const orb = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.3, 0),
+      new THREE.MeshStandardMaterial({ color: 0xf0c040, emissive: 0x664400, roughness: 0.2 })
+    );
+    orb.position.y = 1.25;
+    group.add(ped, orb);
+    group.position.set(x, 0, z);
+    scene3D.add(group);
+
+    interactiveObjects.push({
+      type: 'evidence',
+      data: ev,
+      mesh: group,
+      name: `${ev.emoji} Clue: ${ev.name}`
+    });
+  });
+}
+
+function animate3DScene() {
+  requestAnimationFrame(animate3DScene);
+  if (!scene3D || !camera3D || !renderer3D || !detectiveMesh) return;
+
+  // Detective Movement
+  const speed = 0.13;
+  let moveX = 0;
+  let moveZ = 0;
+
+  if (keysPressed['w'] || keysPressed['arrowup']) moveZ -= 1;
+  if (keysPressed['s'] || keysPressed['arrowdown']) moveZ += 1;
+  if (keysPressed['a'] || keysPressed['arrowleft']) moveX -= 1;
+  if (keysPressed['d'] || keysPressed['arrowright']) moveX += 1;
+
+  if (moveX !== 0 || moveZ !== 0) {
+    const len = Math.hypot(moveX, moveZ);
+    detectiveMesh.position.x += (moveX / len) * speed;
+    detectiveMesh.position.z += (moveZ / len) * speed;
+
+    // Rotate detective in facing direction
+    detectiveMesh.rotation.y = Math.atan2(moveX, moveZ);
+
+    // Keep detective inside finite bounds
+    const maxBound = ROOM_LIMIT - 1.2;
+    detectiveMesh.position.x = Math.max(-maxBound, Math.min(maxBound, detectiveMesh.position.x));
+    detectiveMesh.position.z = Math.max(-maxBound, Math.min(maxBound, detectiveMesh.position.z));
+
+    // Slight walking bob
+    detectiveMesh.position.y = Math.abs(Math.sin(Date.now() * 0.012)) * 0.12;
+  }
+
+  // Smooth camera follow
+  camera3D.position.x += (detectiveMesh.position.x - camera3D.position.x) * 0.06;
+  camera3D.position.z += (detectiveMesh.position.z + 13 - camera3D.position.z) * 0.06;
+  camera3D.lookAt(detectiveMesh.position.x, 1, detectiveMesh.position.z);
+
+  // Animate clues (gentle float & spin)
+  interactiveObjects.forEach(obj => {
+    if (obj.type === 'evidence' && obj.mesh.children[1]) {
+      obj.mesh.children[1].rotation.y += 0.02;
+    }
+  });
+
+  // Proximity Detection
+  checkNearbyInteractions();
+
+  renderer3D.render(scene3D, camera3D);
+}
+
+function checkNearbyInteractions() {
+  const hudTarget = document.getElementById('hud-target-name');
+  const btnInteract = document.getElementById('btn-scene-interact');
+  if (!hudTarget || !btnInteract || !detectiveMesh) return;
+
+  let nearest = null;
+  let minDist = 2.4;
+
+  interactiveObjects.forEach(obj => {
+    const dist = detectiveMesh.position.distanceTo(obj.mesh.position);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = obj;
+    }
+  });
+
+  currentNearbyTarget = nearest;
+
+  if (nearest) {
+    hudTarget.textContent = `Near: ${nearest.name}`;
+    btnInteract.style.display = 'block';
+    btnInteract.textContent = nearest.type === 'suspect' ? `Interrogate ${nearest.data.name}` : `Examine ${nearest.data.name}`;
+  } else {
+    hudTarget.textContent = 'Explore scene. Walk up to suspects or evidence pedestals.';
+    btnInteract.style.display = 'none';
+  }
+}
+
+function interactWithCurrentTarget() {
+  if (!currentNearbyTarget) return;
+
+  if (currentNearbyTarget.type === 'suspect') {
+    switchTab('suspects');
+    openInterview(currentNearbyTarget.data);
+  } else if (currentNearbyTarget.type === 'evidence') {
+    switchTab('evidence');
+    showEvidenceDetail(currentNearbyTarget.data);
   }
 }
 
